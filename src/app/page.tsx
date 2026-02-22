@@ -49,18 +49,32 @@ export default function Home() {
 
   // Sync user to Convex
   useEffect(() => {
-    if (!user) return;
-    upsertUser({
-      clerkId: user.id,
-      name: user.fullName ?? user.username ?? "Anonymous",
-      email: user.emailAddresses[0]?.emailAddress ?? "",
-      imageUrl: user.imageUrl,
-    });
-    setOnlineStatus({ clerkId: user.id, isOnline: true });
-    const handleOffline = () => setOnlineStatus({ clerkId: user.id, isOnline: false });
-    window.addEventListener("beforeunload", handleOffline);
-    return () => window.removeEventListener("beforeunload", handleOffline);
-  }, [user]);
+  if (!user) return;
+  const sync = async () => {
+    let retries = 5;
+    while (retries > 0) {
+      try {
+        await upsertUser({
+          clerkId: user.id,
+          name: user.fullName ?? user.username ?? "Anonymous",
+          email: user.emailAddresses[0]?.emailAddress ?? "",
+          imageUrl: user.imageUrl,
+        });
+        await setOnlineStatus({ clerkId: user.id, isOnline: true });
+        console.log("User synced!");
+        break;
+      } catch (err) {
+        retries--;
+        console.log("Retrying...", retries);
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+  };
+  sync();
+  const handleOffline = () => setOnlineStatus({ clerkId: user.id, isOnline: false });
+  window.addEventListener("beforeunload", handleOffline);
+  return () => window.removeEventListener("beforeunload", handleOffline);
+}, [user, upsertUser, setOnlineStatus]);
 
   // Auto scroll
   useEffect(() => {
